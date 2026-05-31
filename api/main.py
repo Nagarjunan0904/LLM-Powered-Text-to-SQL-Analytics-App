@@ -1,20 +1,29 @@
 """FastAPI backend for the LLM-Powered Text-to-SQL Analytics App."""
+import asyncio
+import json
 import os
+import time
 from collections import Counter
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 
-from db.safety import SafetyError
+from db.safety import SafetyError, validate_sql
 from db.schema_extractor import get_schema_context
 from eval.logger import EvalLogger
 from llm.correction_loop import execute_with_correction
+from llm.prompt_builder import CORRECTION_PROMPT_TEMPLATE, CORE_PROMPT_TEMPLATE
+from llm.sql_generator import _strip_fences
 
 load_dotenv()
+
+_MAX_ATTEMPTS = 3
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -85,6 +94,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ---------------------------------------------------------------------------
+# Internal helper — sync SQL execution (used by streaming endpoint)
+# ---------------------------------------------------------------------------
+
+def _execute_sql(engine, sql: str) -> tuple[list[dict], list[str]]:
+    """Execute sql and return (rows, columns). Caller handles exceptions."""
+    with engine.connect() as conn:
+        result = conn.execute(text(sql))
+        columns = list(result.keys())
+        rows = [dict(row._mapping) for row in result]
+    return rows, columns
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -122,6 +145,116 @@ def query(request: QueryRequest):
         attempts=result["attempts"],
         corrected=result["corrected"],
         latency_ms=result["latency_ms"],
+    )
+
+
+@app.get("/query/stream")
+async def stream_query(
+    question: str = Query(..., description="Natural language question to answer with SQL"),
+):
+    """Stream SQL generation tokens and execution results as Server-Sent Events."""
+
+    async def event_generator():
+        q = question.strip()
+        if not q:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Question must not be empty'})}\n\n"
+            yield f"data: {json.dumps({'type': 'end'})}\n\n"
+            return
+
+        llm = ChatOpenAI(
+            model="gpt-4o",
+            temperature=0,
+            streaming=True,
+            openai_api_key=os.getenv("OPENAI_API_KEY"),
+        )
+
+        t_start = time.perf_counter()
+        current_sql = ""
+        last_error = ""
+
+        for attempt in range(1, _MAX_ATTEMPTS + 1):
+            attempt_t0 = time.perf_counter()
+
+            # Build prompt and emit status
+            if attempt == 1:
+                yield f"data: {json.dumps({'type': 'status', 'content': 'Generating SQL...'})}\n\n"
+                messages = CORE_PROMPT_TEMPLATE.format_messages(
+                    schema=app.state.schema,
+                    sample_rows=app.state.sample_rows,
+                    question=q,
+                )
+            else:
+                yield f"data: {json.dumps({'type': 'status', 'content': f'Correcting (attempt {attempt})...'})}\n\n"
+                messages = CORRECTION_PROMPT_TEMPLATE.format_messages(
+                    failed_sql=current_sql,
+                    error_message=last_error,
+                    schema=app.state.schema,
+                )
+
+            # Stream tokens from GPT-4o
+            tokens: list[str] = []
+            async for chunk in llm.astream(messages):
+                token = chunk.content
+                if token:
+                    tokens.append(token)
+                    yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+
+            current_sql = _strip_fences("".join(tokens))
+
+            # Safety check
+            try:
+                validate_sql(current_sql)
+            except SafetyError as exc:
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Query rejected by safety guardrail: {exc}'})}\n\n"
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
+                return
+
+            # Execute SQL (sync call moved off the event loop)
+            try:
+                rows, columns = await asyncio.to_thread(
+                    _execute_sql, app.state.engine, current_sql
+                )
+                latency_ms = round((time.perf_counter() - t_start) * 1000, 1)
+                attempt_latency = round((time.perf_counter() - attempt_t0) * 1000, 1)
+
+                app.state.eval_logger.log(
+                    question=q,
+                    attempt_num=attempt,
+                    sql=current_sql,
+                    error=None,
+                    latency_ms=attempt_latency,
+                    success=True,
+                )
+
+                yield f"data: {json.dumps({'type': 'done', 'sql': current_sql, 'attempts': attempt, 'corrected': attempt > 1, 'latency_ms': latency_ms})}\n\n"
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
+                return
+
+            except Exception as exc:
+                last_error = str(exc)
+                attempt_latency = round((time.perf_counter() - attempt_t0) * 1000, 1)
+
+                app.state.eval_logger.log(
+                    question=q,
+                    attempt_num=attempt,
+                    sql=current_sql,
+                    error=last_error,
+                    latency_ms=attempt_latency,
+                    success=False,
+                )
+
+        # All attempts exhausted
+        yield f"data: {json.dumps({'type': 'error', 'message': f'Could not generate a valid query after {_MAX_ATTEMPTS} attempts'})}\n\n"
+        yield f"data: {json.dumps({'type': 'end'})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )
 
 
@@ -169,7 +302,6 @@ def eval_stats():
         sum(r["latency_ms"] for r in records) / len(records), 1
     ) if records else 0.0
 
-    # questions where any attempt_number > 1 exists
     corrected_questions = {r["question"] for r in records if r["attempt_number"] > 1}
     correction_rate = round(len(corrected_questions) / total_queries * 100, 1) if total_queries else 0.0
 
