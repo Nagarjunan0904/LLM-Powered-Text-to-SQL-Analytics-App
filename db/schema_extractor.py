@@ -24,24 +24,24 @@ def schema_to_ddl(schema: dict) -> str:
     return "\n".join(lines)
 
 
-def get_schema_context(eng=None) -> str:
+def get_schema_context(eng=None) -> dict:
     """
-    Build a human-readable schema context string for LLM prompt injection.
+    Return schema metadata and sample rows as two separate strings,
+    ready to be passed as individual arguments to generate_sql().
 
-    For each user-defined table this function:
-    1. Queries information_schema.tables to list tables.
-    2. Queries information_schema.columns for column names + data types.
-    3. Fetches one sample row via SELECT * ... LIMIT 1.
-
-    Returns a formatted multi-line string, e.g.:
-        Table: yellow_taxi_trips (columns: pickup_datetime timestamp, fare_amount numeric, ...)
-        Sample row: (2023-01-01 08:23:11, 12.50, 2.00, ...)
+    Returns:
+        {
+          "schema":      "Table: yellow_taxi_trips (columns: vendor_id integer, ...)",
+          "sample_rows": "yellow_taxi_trips: (2, 2023-01-01 00:32:10, ...)",
+        }
     """
     if eng is None:
         eng = engine
 
+    schema_lines = []
+    sample_lines = []
+
     with eng.connect() as conn:
-        # 1. List user tables
         tables_result = conn.execute(
             text(
                 "SELECT table_name FROM information_schema.tables "
@@ -51,9 +51,8 @@ def get_schema_context(eng=None) -> str:
         )
         table_names = [row[0] for row in tables_result]
 
-        blocks = []
         for table in table_names:
-            # 2. Fetch column metadata
+            # Column metadata
             cols_result = conn.execute(
                 text(
                     "SELECT column_name, data_type "
@@ -65,20 +64,21 @@ def get_schema_context(eng=None) -> str:
             )
             columns = [(row[0], row[1]) for row in cols_result]
             col_str = ", ".join(f"{name} {dtype}" for name, dtype in columns)
+            schema_lines.append(f"Table: {table} (columns: {col_str})")
 
-            # 3. One sample row
+            # One sample row
             sample_result = conn.execute(
                 text(f"SELECT * FROM {table} LIMIT 1")  # noqa: S608
             )
             row = sample_result.fetchone()
             if row:
-                sample_str = "(" + ", ".join(str(v) for v in row) + ")"
+                sample_lines.append(
+                    f"{table}: (" + ", ".join(str(v) for v in row) + ")"
+                )
             else:
-                sample_str = "(no rows)"
+                sample_lines.append(f"{table}: (no rows)")
 
-            blocks.append(
-                f"Table: {table} (columns: {col_str})\n"
-                f"Sample row: {sample_str}"
-            )
-
-    return "\n\n".join(blocks)
+    return {
+        "schema": "\n".join(schema_lines),
+        "sample_rows": "\n".join(sample_lines),
+    }
