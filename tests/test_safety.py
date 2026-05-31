@@ -1,33 +1,87 @@
-"""Tests to ensure the LLM never generates destructive SQL."""
+"""12 test cases for the SQL safety guardrail (db/safety.py)."""
 import pytest
 
-FORBIDDEN_KEYWORDS = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE"]
+from db.safety import SafetyError, validate_sql
 
 
-def is_safe_sql(sql: str) -> bool:
-    upper = sql.upper()
-    return not any(kw in upper for kw in FORBIDDEN_KEYWORDS)
+# ---------------------------------------------------------------------------
+# SHOULD PASS — validate_sql returns True
+# ---------------------------------------------------------------------------
+
+def test_simple_select():
+    assert validate_sql("SELECT COUNT(*) FROM yellow_taxi_trips") is True
 
 
-@pytest.mark.parametrize("sql,expected", [
-    ("SELECT * FROM users", True),
-    ("SELECT id FROM orders WHERE total > 100", True),
-    ("DROP TABLE users", False),
-    ("DELETE FROM users WHERE id=1", False),
-    ("INSERT INTO users (name) VALUES ('x')", False),
-    ("UPDATE users SET name='x' WHERE id=1", False),
-    ("ALTER TABLE users ADD COLUMN foo TEXT", False),
-    ("TRUNCATE TABLE logs", False),
-    ("CREATE TABLE foo (id INT)", False),
-])
-def test_sql_safety(sql, expected):
-    assert is_safe_sql(sql) == expected
+def test_select_with_where():
+    assert validate_sql(
+        "SELECT fare_amount FROM yellow_taxi_trips WHERE trip_distance > 5"
+    ) is True
 
 
-def test_select_only_allowed():
-    safe_queries = [
-        "SELECT count(*) FROM orders",
-        "SELECT u.name, o.total FROM users u JOIN orders o ON u.id = o.user_id",
-    ]
-    for q in safe_queries:
-        assert is_safe_sql(q), f"Expected safe: {q}"
+def test_select_group_by_order_by():
+    assert validate_sql(
+        "SELECT payment_type, COUNT(*) AS trips "
+        "FROM yellow_taxi_trips "
+        "GROUP BY payment_type "
+        "ORDER BY trips DESC"
+    ) is True
+
+
+def test_select_with_join():
+    assert validate_sql(
+        "SELECT t.vendor_id, z.zone "
+        "FROM yellow_taxi_trips t "
+        "JOIN taxi_zones z ON t.pu_location_id = z.location_id"
+    ) is True
+
+
+def test_update_inside_string_literal():
+    # 'update' appears only inside a string value — word boundary prevents match
+    assert validate_sql(
+        "SELECT * FROM t WHERE status = 'update_pending'"
+    ) is True
+
+
+def test_create_inside_column_alias():
+    # 'create' is part of the identifier 'create_count' — word boundary prevents match
+    assert validate_sql(
+        "SELECT COUNT(*) AS create_count FROM yellow_taxi_trips"
+    ) is True
+
+
+# ---------------------------------------------------------------------------
+# SHOULD FAIL — validate_sql raises SafetyError
+# ---------------------------------------------------------------------------
+
+def test_drop_table():
+    with pytest.raises(SafetyError):
+        validate_sql("DROP TABLE yellow_taxi_trips")
+
+
+def test_delete():
+    with pytest.raises(SafetyError):
+        validate_sql("DELETE FROM yellow_taxi_trips WHERE vendor_id = 1")
+
+
+def test_insert():
+    with pytest.raises(SafetyError):
+        validate_sql("INSERT INTO yellow_taxi_trips VALUES (1, 2, 3)")
+
+
+def test_update():
+    with pytest.raises(SafetyError):
+        validate_sql("UPDATE yellow_taxi_trips SET fare_amount = 0")
+
+
+def test_union_injection_passes_safety():
+    # UNION alone is not destructive — the SELECT-start guardrail is the
+    # primary protection; blocking UNION would also block legitimate analytics.
+    assert validate_sql(
+        "SELECT * FROM users UNION SELECT * FROM admin"
+    ) is True
+
+
+def test_disguised_drop_whitespace_mixed_case():
+    # Leading whitespace is stripped; mixed case is normalised — still caught.
+    with pytest.raises(SafetyError):
+        validate_sql("   DrOp TABLE yellow_taxi_trips")

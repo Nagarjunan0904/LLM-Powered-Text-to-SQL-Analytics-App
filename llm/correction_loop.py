@@ -13,6 +13,7 @@ from langchain_openai import ChatOpenAI
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from db.safety import validate_sql
 from eval.logger import EvalLogger
 from llm.prompt_builder import CORRECTION_PROMPT_TEMPLATE
 from llm.sql_generator import generate_sql, _strip_fences
@@ -33,7 +34,8 @@ def _get_correction_llm() -> ChatOpenAI:
 
 
 def _run_sql(engine, sql: str) -> tuple[list[dict], list[str]]:
-    """Execute sql and return (rows, columns). Raises on any DB error."""
+    """Execute sql and return (rows, columns). Raises SafetyError or DB error."""
+    validate_sql(sql)
     with engine.connect() as conn:
         result = conn.execute(text(sql))
         columns = list(result.keys())
