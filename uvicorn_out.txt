@@ -1,0 +1,7 @@
+API ready — schema cached, 1 tables found
+INFO:     127.0.0.1:59291 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52019 - "GET /schema HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52025 - "GET /examples HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52027 - "POST /query HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52030 - "GET /eval HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52039 - "GET /openapi.json HTTP/1.1" 200 OK
