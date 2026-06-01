@@ -119,30 +119,15 @@ export default function App() {
       {/* ── BODY ── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* LEFT SIDEBAR */}
-        <aside
-          className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-200 overflow-hidden flex-shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col relative`}
-        >
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 z-10 text-xs"
-            title="Collapse sidebar"
-          >
-            ✕
-          </button>
-          <SchemaExplorer schema={schema} />
-        </aside>
-
-        {/* SIDEBAR RE-OPEN TOGGLE */}
-        {!sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="w-6 flex-shrink-0 bg-gray-50 border-r border-gray-200 hover:bg-gray-100 text-gray-400 flex items-center justify-center text-base"
-            title="Open sidebar"
-          >
-            ›
-          </button>
-        )}
+        {/* LEFT SIDEBAR — SchemaExplorer owns collapse/expand */}
+        <SchemaExplorer
+          schema={schema}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(p => !p)}
+          onColumnClick={(col) =>
+            setQuestion(prev => prev ? `${prev} ${col}` : col)
+          }
+        />
 
         {/* CENTER COLUMN */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0 overflow-y-auto">
