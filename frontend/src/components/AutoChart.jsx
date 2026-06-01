@@ -100,7 +100,14 @@ function transformData(columns, rows, typedColumns, chartType, activeChart) {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-const PURPLE = '#7c3aed'
+const AMBER = '#f59e0b'
+const GRID  = '#2a2a2a'
+const TICK  = { fontSize: 11, fill: '#525252' }
+const TOOLTIP_STYLE = {
+  contentStyle: { background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#d4d4d4', borderRadius: '8px' },
+  itemStyle: { color: '#f5f5f5' },
+  cursor: { fill: 'rgba(245,158,11,0.05)' },
+}
 
 export default function AutoChart({ columns, rows }) {
   const [activeChart, setActiveChart] = useState('bar')
@@ -123,9 +130,10 @@ export default function AutoChart({ columns, rows }) {
   // ── No-chart placeholder ─────────────────────────────────────────────────
   if (chartType === 'none') {
     return (
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center m-4">
-        <p className="text-gray-400 text-sm">Chart not available for this result shape</p>
-        <p className="text-gray-300 text-xs mt-2">
+      <div className="rounded-xl p-6 text-center m-4 animate-fadeIn"
+        style={{ background: '#111111', border: '1px solid #2a2a2a' }}>
+        <p className="text-sm" style={{ color: '#525252' }}>Chart not available for this result shape</p>
+        <p className="text-xs mt-2" style={{ color: '#3a3a3a' }}>
           Results with 1 text + 1 number, or 1 date + 1 number column auto-generate charts
         </p>
       </div>
@@ -140,28 +148,30 @@ export default function AutoChart({ columns, rows }) {
   }[chartType]
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 m-4">
+    <div className="rounded-xl p-4 m-4 animate-fadeIn"
+      style={{ background: '#111111', border: '1px solid #2a2a2a' }}>
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+        <span className="text-xs font-medium uppercase tracking-wide" style={{ color: '#f59e0b' }}>
           Auto-detected: {chartLabel}
         </span>
 
-        {/* Bar / Line toggle (bar-line case only) */}
+        {/* Bar / Line toggle */}
         {chartType === 'bar-line' && (
           <div className="flex gap-1">
             {['Bar', 'Line'].map(label => {
               const val = label.toLowerCase()
+              const active = activeChart === val
               return (
                 <button
                   key={val}
                   onClick={() => setActiveChart(val)}
-                  className={`text-xs px-3 py-1 rounded-full transition-colors ${
-                    activeChart === val
-                      ? 'bg-purple-600 text-white'
-                      : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
-                  }`}
+                  className="text-xs px-3 py-1 rounded-full transition-all"
+                  style={active
+                    ? { background: '#f59e0b', color: '#0a0a0a', fontWeight: 600 }
+                    : { background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#a3a3a3' }
+                  }
                 >
                   {label}
                 </button>
@@ -175,33 +185,21 @@ export default function AutoChart({ columns, rows }) {
       <ResponsiveContainer width="100%" height={280}>
         {resolvedType === 'bar' ? (
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis
-              dataKey={xKey}
-              tick={{ fontSize: 11 }}
-              angle={-35}
-              textAnchor="end"
-              height={60}
-            />
-            <YAxis
-              tick={{ fontSize: 11 }}
-              tickFormatter={v => v.toLocaleString()}
-            />
-            <Tooltip formatter={v => v.toLocaleString()} />
-            <Bar dataKey={yKey} fill={PURPLE} radius={[4, 4, 0, 0]} />
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+            <XAxis dataKey={xKey} tick={TICK} angle={-35} textAnchor="end" height={60} />
+            <YAxis tick={TICK} tickFormatter={v => v.toLocaleString()} />
+            <Tooltip {...TOOLTIP_STYLE} formatter={v => v.toLocaleString()} />
+            <Bar dataKey={yKey} fill={AMBER} radius={[4, 4, 0, 0]} />
           </BarChart>
         ) : resolvedType === 'line' ? (
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
-            <YAxis
-              tick={{ fontSize: 11 }}
-              tickFormatter={v => v.toLocaleString()}
-            />
-            <Tooltip formatter={v => v.toLocaleString()} />
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+            <XAxis dataKey={xKey} tick={TICK} />
+            <YAxis tick={TICK} tickFormatter={v => v.toLocaleString()} />
+            <Tooltip {...TOOLTIP_STYLE} formatter={v => v.toLocaleString()} />
             <Line
               dataKey={yKey}
-              stroke={PURPLE}
+              stroke={AMBER}
               strokeWidth={2}
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}
@@ -209,17 +207,17 @@ export default function AutoChart({ columns, rows }) {
           </LineChart>
         ) : (
           <ScatterChart>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey={xKey} tick={{ fontSize: 11 }} name={xKey} />
-            <YAxis dataKey={yKey} tick={{ fontSize: 11 }} name={yKey} />
-            <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-            <Scatter data={data} fill={PURPLE} />
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+            <XAxis dataKey={xKey} tick={TICK} name={xKey} />
+            <YAxis dataKey={yKey} tick={TICK} name={yKey} />
+            <Tooltip {...TOOLTIP_STYLE} cursor={{ strokeDasharray: '3 3' }} />
+            <Scatter data={data} fill={AMBER} />
           </ScatterChart>
         )}
       </ResponsiveContainer>
 
       {/* ── Footer ── */}
-      <p className="text-xs text-gray-400 text-center mt-2">
+      <p className="text-xs text-center mt-2" style={{ color: '#525252' }}>
         {rows.length} data points · {xKey} vs {yKey}
       </p>
     </div>

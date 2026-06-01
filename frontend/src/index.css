@@ -1,3 +1,30 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Animations ─────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.animate-fadeInUp { animation: fadeInUp 0.3s ease-out forwards; }
+.animate-fadeIn   { animation: fadeIn 0.2s ease-out forwards; }
+.animate-blink    { animation: blink 1s step-end infinite; }
+
+/* ── Thin scrollbars ─────────────────────────────────────────── */
+::-webkit-scrollbar              { width: 4px; height: 4px; }
+::-webkit-scrollbar-track        { background: #0a0a0a; }
+::-webkit-scrollbar-thumb        { background: #2a2a2a; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover  { background: #f59e0b; }
+
+/* ── Global dark background ──────────────────────────────────── */
+body { background: #0a0a0a; }

@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 *.db
 .DS_Store
+verify_screenshots/
+  verify_screenshots_*/
+  screenshots/
+  *.png
+  *.jpg

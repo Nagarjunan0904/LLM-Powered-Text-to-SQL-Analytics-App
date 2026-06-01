@@ -17,8 +17,6 @@ export default function QueryInput({
     }
   }
 
-  // Pill click sets question AND immediately submits with that text
-  // (pass directly to avoid async state closure capturing old value)
   function handlePillClick(ex) {
     setQuestion(ex)
     onSubmit(ex)
@@ -27,48 +25,99 @@ export default function QueryInput({
   const textareaRows = Math.min(Math.max(question.split('\n').length, 3), 6)
 
   return (
-    <div className="p-4 border-b border-gray-200 bg-white flex-shrink-0">
-
+    <div
+      className="p-4 flex-shrink-0 animate-fadeIn"
+      style={{ borderBottom: '1px solid #2a2a2a', background: '#111111' }}
+    >
       {/* ── Input row ── */}
       <div className="flex gap-3 items-start">
         <textarea
-          className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none"
+          className="flex-1 rounded-xl px-4 py-3 text-sm resize-none outline-none transition-all duration-200"
+          style={{
+            background: '#1a1a1a',
+            border: '1px solid #2a2a2a',
+            color: '#f5f5f5',
+            caretColor: '#f59e0b',
+          }}
           placeholder={"Ask anything about NYC taxi data...\ne.g. What is the average fare by hour of day?"}
           value={question}
           rows={textareaRows}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={loading}
+          onFocus={e => {
+            e.target.style.border = '1px solid rgba(245,158,11,0.5)'
+            e.target.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.1)'
+          }}
+          onBlur={e => {
+            e.target.style.border = '1px solid #2a2a2a'
+            e.target.style.boxShadow = 'none'
+          }}
         />
         <button
           onClick={() => onSubmit()}
           disabled={loading || !question.trim()}
-          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-6 py-3 font-medium transition-colors disabled:opacity-50 whitespace-nowrap flex-shrink-0"
+          className="flex items-center gap-2 rounded-xl px-6 py-3 font-bold transition-all duration-200 whitespace-nowrap flex-shrink-0"
+          style={{
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: '#0a0a0a',
+            boxShadow: '0 4px 15px rgba(245,158,11,0.3)',
+            opacity: loading || !question.trim() ? 0.4 : 1,
+          }}
+          onMouseEnter={e => {
+            if (!loading && question.trim()) {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #d97706, #b45309)'
+              e.currentTarget.style.boxShadow = '0 4px 20px rgba(245,158,11,0.5)'
+              e.currentTarget.style.transform = 'scale(1.05)'
+            }
+          }}
+          onMouseLeave={e => {
+            if (!loading && question.trim()) {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)'
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(245,158,11,0.3)'
+              e.currentTarget.style.transform = 'scale(1)'
+            }
+          }}
         >
           {loading ? (
             <>
-              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"
+                style={{ color: '#f59e0b' }}>
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Thinking...
+              <span style={{ color: '#a3a3a3' }}>Thinking...</span>
             </>
-          ) : (
-            'Run Query'
-          )}
+          ) : 'Run Query'}
         </button>
       </div>
 
       {/* ── Example pills ── */}
       {examples.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-gray-500 flex-shrink-0">Try an example:</span>
-          {examples.map((ex) => (
+          <span className="text-xs flex-shrink-0" style={{ color: '#525252' }}>Try an example:</span>
+          {examples.map((ex, i) => (
             <button
               key={ex}
               onClick={() => handlePillClick(ex)}
               disabled={loading}
-              className="rounded-full border border-gray-300 px-3 py-1 text-xs hover:bg-purple-50 hover:border-purple-300 cursor-pointer transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              className="rounded-full px-3 py-1 text-xs cursor-pointer transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none animate-fadeIn"
+              style={{
+                border: '1px solid #2a2a2a',
+                background: '#1a1a1a',
+                color: '#a3a3a3',
+                animationDelay: `${i * 40}ms`,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(245,158,11,0.1)'
+                e.currentTarget.style.border = '1px solid rgba(245,158,11,0.4)'
+                e.currentTarget.style.color = '#f59e0b'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = '#1a1a1a'
+                e.currentTarget.style.border = '1px solid #2a2a2a'
+                e.currentTarget.style.color = '#a3a3a3'
+              }}
             >
               {ex}
             </button>
@@ -76,24 +125,38 @@ export default function QueryInput({
         </div>
       )}
 
-      {/* ── Animated status bar (loading only) ── */}
+      {/* ── Animated status bar ── */}
       {loading && statusMessage && (
-        <div className="flex items-center gap-2 mt-3 text-sm text-purple-600">
-          <div className="animate-pulse bg-purple-500 rounded-full w-2 h-2 flex-shrink-0" />
+        <div className="flex items-center gap-2 mt-3 text-sm" style={{ color: '#f59e0b' }}>
+          <div className="animate-pulse rounded-full w-2 h-2 flex-shrink-0" style={{ background: '#f59e0b' }} />
           <span>{statusMessage}</span>
         </div>
       )}
 
-      {/* ── Streaming SQL preview (dark terminal style) ── */}
+      {/* ── Streaming SQL preview ── */}
       {loading && streamingSQL && (
-        <pre className="mt-2 bg-gray-900 text-green-400 font-mono text-xs p-3 rounded-lg max-h-24 overflow-auto whitespace-pre-wrap break-all">
-          {streamingSQL}
+        <pre
+          className="mt-2 font-mono text-xs p-3 rounded-lg max-h-24 overflow-auto whitespace-pre-wrap break-all"
+          style={{
+            background: '#0a0a0a',
+            color: '#f59e0b',
+            border: '1px solid rgba(245,158,11,0.2)',
+          }}
+        >
+          {streamingSQL}<span className="animate-blink">▌</span>
         </pre>
       )}
 
-      {/* ── Correction badge (shown after success, if correction loop fired) ── */}
+      {/* ── Correction badge ── */}
       {corrected && !loading && (
-        <div className="mt-3 bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-lg px-4 py-2 text-sm flex items-center gap-2">
+        <div
+          className="mt-3 rounded-lg px-4 py-2 text-sm flex items-center gap-2"
+          style={{
+            background: 'rgba(245,158,11,0.1)',
+            border: '1px solid rgba(245,158,11,0.3)',
+            color: '#f59e0b',
+          }}
+        >
           <span>⚡</span>
           <span>
             Corrected {attempts - 1} time{attempts - 1 !== 1 ? 's' : ''} — query fixed by self-correction loop
@@ -103,7 +166,14 @@ export default function QueryInput({
 
       {/* ── Error display ── */}
       {error && !loading && (
-        <div className="mt-3 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-2 text-sm">
+        <div
+          className="mt-3 rounded-lg px-4 py-2 text-sm"
+          style={{
+            background: 'rgba(239,68,68,0.1)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            color: '#f87171',
+          }}
+        >
           {error}
         </div>
       )}
