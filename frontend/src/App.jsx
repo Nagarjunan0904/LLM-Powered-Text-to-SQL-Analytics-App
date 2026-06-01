@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getSchema, getExamples, streamQuery } from './api/client'
 import QueryInput from './components/QueryInput'
 import SqlPanel from './components/SqlPanel'
@@ -16,6 +16,7 @@ function hasNumericColumn(columns, rows) {
 export default function App() {
   const [question, setQuestion]           = useState('')
   const [sql, setSql]                     = useState('')
+  const [originalSql, setOriginalSql]     = useState('')
   const [columns, setColumns]             = useState([])
   const [rows, setRows]                   = useState([])
   const [attempts, setAttempts]           = useState(0)
@@ -29,6 +30,10 @@ export default function App() {
   const [streamingSQL, setStreamingSQL]   = useState('')
   const [statusMessage, setStatusMessage] = useState('')
 
+  // Ref gives synchronous read of streaming tokens across closure calls.
+  // Used to snapshot attempt-1 SQL when the correction status event fires.
+  const streamRef = useRef('')
+
   useEffect(() => {
     getSchema().then(setSchema).catch(console.error)
     getExamples().then(setExamples).catch(console.error)
@@ -41,9 +46,12 @@ export default function App() {
       : question.trim()
     if (!q || loading) return
 
+    // Reset all output state for the new query
+    streamRef.current = ''
     setLoading(true)
     setError(null)
     setSql('')
+    setOriginalSql('')
     setColumns([])
     setRows([])
     setStreamingSQL('')
@@ -53,8 +61,20 @@ export default function App() {
     setLatencyMs(0)
 
     streamQuery(q, {
-      onStatus:  (content) => setStatusMessage(content),
-      onToken:   (token)   => setStreamingSQL((prev) => prev + token),
+      onToken: (token) => {
+        streamRef.current += token
+        setStreamingSQL((prev) => prev + token)
+      },
+      onStatus: (content) => {
+        setStatusMessage(content)
+        // When the correction loop starts a new attempt, snapshot the
+        // failed SQL and reset the streaming display for the fresh attempt.
+        if (content.startsWith('Correcting')) {
+          setOriginalSql(streamRef.current.trim())
+          streamRef.current = ''
+          setStreamingSQL('')
+        }
+      },
       onDone: (payload) => {
         setStreamingSQL('')
         setStatusMessage('')
@@ -63,7 +83,7 @@ export default function App() {
         setCorrected(payload.corrected)
         setLatencyMs(payload.latency_ms)
         setLoading(false)
-        // Fetch structured rows + columns (SSE done event has no rows)
+        // Fetch structured rows + columns (SSE done event carries no rows)
         fetch('http://localhost:8000/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -132,7 +152,7 @@ export default function App() {
         )}
 
         {/* CENTER COLUMN */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0 overflow-y-auto">
           <QueryInput
             question={question}
             setQuestion={setQuestion}
@@ -152,9 +172,10 @@ export default function App() {
             attempts={attempts}
             corrected={corrected}
             latencyMs={latencyMs}
+            originalSql={originalSql}
           />
 
-          <ResultsTable columns={columns} rows={rows} />
+          <ResultsTable columns={columns} rows={rows} latencyMs={latencyMs} error={error} />
         </div>
 
         {/* RIGHT CHART PANEL */}
