@@ -147,6 +147,26 @@ def load_month(cur, month: int) -> int:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Load NYC Yellow Taxi 2023 data into PostgreSQL.")
+    parser.add_argument(
+        "--months",
+        nargs="+",
+        metavar="MM",
+        help="Months to load as zero-padded numbers (e.g. 01 02 03). Defaults to all 12 months.",
+    )
+    args = parser.parse_args()
+
+    if args.months:
+        months = [int(m) for m in args.months]
+        invalid = [m for m in months if not 1 <= m <= 12]
+        if invalid:
+            parser.error(f"Invalid month(s): {invalid}. Must be 01–12.")
+    else:
+        months = list(range(1, 13))
+
+    print(f"Loading months: {[f'{m:02d}' for m in months]}")
+
     dsn = parse_dsn(DATABASE_URL)
     conn = psycopg2.connect(**dsn)
     conn.autocommit = False
@@ -160,7 +180,7 @@ def main():
             conn.commit()
 
         total = 0
-        for month in range(1, 13):
+        for month in months:
             with conn.cursor() as cur:
                 n = load_month(cur, month)
                 conn.commit()
