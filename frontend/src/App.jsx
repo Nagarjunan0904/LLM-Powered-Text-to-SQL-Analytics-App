@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getSchema, getExamples, streamQuery } from './api/client'
+import { getSchema, getExamples, getEval, postQuery, streamQuery } from './api/client'
 import QueryInput from './components/QueryInput'
 import SqlPanel from './components/SqlPanel'
 import ResultsTable from './components/ResultsTable'
@@ -22,24 +22,32 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen]     = useState(true)
   const [streamingSQL, setStreamingSQL]   = useState('')
   const [statusMessage, setStatusMessage] = useState('')
+  const [evalStats, setEvalStats]         = useState(null)
 
-  // Ref gives synchronous read of streaming tokens across closure calls.
-  // Used to snapshot attempt-1 SQL when the correction status event fires.
   const streamRef = useRef('')
+
+  function fetchEval() {
+    getEval().then(setEvalStats).catch(console.error)
+  }
 
   useEffect(() => {
     getSchema().then(setSchema).catch(console.error)
     getExamples().then(setExamples).catch(console.error)
+    fetchEval()
+    const interval = setInterval(fetchEval, 60_000)
+    return () => clearInterval(interval)
   }, [])
 
-  // overrideQuestion: passed by pill clicks to bypass async state
+  const correctedCount = evalStats
+    ? Math.round(evalStats.total_queries * evalStats.correction_rate / 100)
+    : 0
+
   function handleSubmit(overrideQuestion) {
     const q = typeof overrideQuestion === 'string'
       ? overrideQuestion.trim()
       : question.trim()
     if (!q || loading) return
 
-    // Reset all output state for the new query
     streamRef.current = ''
     setLoading(true)
     setError(null)
@@ -60,8 +68,6 @@ export default function App() {
       },
       onStatus: (content) => {
         setStatusMessage(content)
-        // When the correction loop starts a new attempt, snapshot the
-        // failed SQL and reset the streaming display for the fresh attempt.
         if (content.startsWith('Correcting')) {
           setOriginalSql(streamRef.current.trim())
           streamRef.current = ''
@@ -76,13 +82,8 @@ export default function App() {
         setCorrected(payload.corrected)
         setLatencyMs(payload.latency_ms)
         setLoading(false)
-        // Fetch structured rows + columns (SSE done event carries no rows)
-        fetch('http://localhost:8000/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: q }),
-        })
-          .then((r) => r.json())
+        // Fetch structured rows + columns via postQuery (uses VITE_API_URL)
+        postQuery(q)
           .then((data) => {
             if (data.columns) setColumns(data.columns)
             if (data.rows)    setRows(data.rows)
@@ -121,13 +122,32 @@ export default function App() {
         </span>
 
         <div className="ml-auto flex items-center gap-3">
+          {/* Self-correction counter */}
+          {correctedCount > 0 && (
+            <span
+              className="text-xs rounded-full px-2 py-0.5 animate-fadeIn"
+              style={{
+                background: 'rgba(245,158,11,0.1)',
+                color: '#f59e0b',
+                border: '1px solid rgba(245,158,11,0.2)',
+              }}
+            >
+              ⚡ Corrected {correctedCount} time{correctedCount !== 1 ? 's' : ''}
+            </span>
+          )}
           {/* Live badge */}
           <span className="flex items-center gap-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs rounded-full px-2 py-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             Live
           </span>
           {/* GitHub */}
-          <a href="https://github.com/Nagarjunan0904/LLM-Powered-Text-to-SQL-Analytics-App" target="_blank" rel="noopener noreferrer" aria-label="GitHub" className="text-neutral-400 hover:text-amber-400 transition-colors">
+          <a
+            href="https://github.com/Nagarjunan0904/LLM-Powered-Text-to-SQL-Analytics-App"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            className="text-neutral-400 hover:text-amber-400 transition-colors"
+          >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
             </svg>
@@ -138,7 +158,7 @@ export default function App() {
       {/* ── BODY ── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* LEFT SIDEBAR — SchemaExplorer owns collapse/expand */}
+        {/* LEFT SIDEBAR */}
         <SchemaExplorer
           schema={schema}
           sidebarOpen={sidebarOpen}
@@ -168,6 +188,7 @@ export default function App() {
             statusMessage={statusMessage}
             streamingSQL={streamingSQL}
             error={error}
+            showHero={!sql}
           />
 
           <SqlPanel

@@ -9,6 +9,7 @@ export default function QueryInput({
   statusMessage,
   streamingSQL,
   error,
+  showHero,
 }) {
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -91,6 +92,13 @@ export default function QueryInput({
           ) : 'Run Query'}
         </button>
       </div>
+
+      {/* ── Hero subtitle (shown before first query) ── */}
+      {showHero && (
+        <p className="text-center text-sm mb-3 mt-2 animate-fadeIn" style={{ color: '#525252' }}>
+          Ask any question about NYC taxi data — get an answer in seconds.
+        </p>
+      )}
 
       {/* ── Example pills ── */}
       {examples.length > 0 && (

@@ -25,6 +25,12 @@ export async function getExamples() {
   return res.json()
 }
 
+export async function getEval() {
+  const res = await fetch(`${BASE_URL}/eval`)
+  if (!res.ok) throw new Error('Failed to fetch eval stats')
+  return res.json()
+}
+
 export function streamQuery(question, { onToken, onStatus, onDone, onError }) {
   const url = `${BASE_URL}/query/stream?question=${encodeURIComponent(question)}`
   let cancelled = false
