@@ -116,7 +116,9 @@ export default function App() {
         <span className="font-bold text-lg text-white tracking-tight">QueryMind</span>
         {/* Amber divider */}
         <span className="mx-3 w-px h-5 bg-amber-500/30 flex-shrink-0" />
-        <span className="text-sm text-neutral-400">NYC Taxi · 38,310,226 rows</span>
+        <span className="text-sm text-neutral-400">
+          NYC Taxi · {schema?.row_count ? schema.row_count.toLocaleString() + ' rows' : '…'}
+        </span>
 
         <div className="ml-auto flex items-center gap-3">
           {/* Live badge */}

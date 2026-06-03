@@ -46,6 +46,7 @@ class SchemaResponse(BaseModel):
     schema_text: str
     sample_rows: str
     table_count: int
+    row_count: int
 
 
 class EvalStats(BaseModel):
@@ -72,8 +73,17 @@ async def lifespan(app: FastAPI):
 
     app.state.eval_logger = EvalLogger()
 
+    # Cache row count once at startup
+    try:
+        with engine.connect() as conn:
+            app.state.row_count = conn.execute(
+                text("SELECT COUNT(*) FROM yellow_taxi_trips")
+            ).scalar() or 0
+    except Exception:
+        app.state.row_count = 0
+
     table_count = app.state.schema.count("Table:")
-    print(f"API ready — schema cached, {table_count} tables found")
+    print(f"API ready — schema cached, {table_count} tables, {app.state.row_count:,} rows")
 
     yield
 
@@ -88,7 +98,13 @@ app = FastAPI(title="Text-to-SQL Analytics API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://victorious-charisma-production-7052.up.railway.app",
+        "https://*.vercel.app",
+        "*",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -264,18 +280,19 @@ def schema():
         schema_text=app.state.schema,
         sample_rows=app.state.sample_rows,
         table_count=app.state.schema.count("Table:"),
+        row_count=app.state.row_count,
     )
 
 
 @app.get("/examples")
 def examples():
     return [
-        "How many total trips were taken in 2023?",
+        "How many total trips were taken?",
         "What is the average fare amount by month?",
         "Which pickup location had the most trips?",
-        "What is the total revenue by day of the week?",
-        "What percentage of trips were paid by credit card?",
         "What is the average tip amount by payment type?",
+        "What percentage of trips were paid by credit card?",
+        "Show the top 5 busiest hours of the day for pickups",
     ]
 
 
