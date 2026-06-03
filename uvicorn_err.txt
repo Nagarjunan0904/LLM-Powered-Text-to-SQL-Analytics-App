@@ -5,3 +5,24 @@ INFO:     Started server process [32636]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 WARNING:  WatchFiles detected changes in 'api\main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [32636]
+WARNING:  WatchFiles detected changes in 'api\main.py'. Reloading...
+INFO:     Started server process [49096]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Task was destroyed but it is pending!
+task: <Task pending name='Task-1' coro=<Server.serve() done, defined at D:\AI_ML\Projects\LLM-Powered-Text-to-SQL-Analytics-App\.venv\lib\site-packages\uvicorn\server.py:77> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+INFO:     Started server process [16664]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'api\main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [16664]
+INFO:     Started server process [21020]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

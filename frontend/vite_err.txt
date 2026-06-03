@@ -1,0 +1,5 @@
+[2m9:15:33 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mNotAllowedError[22m: Failed to execute 'writeText' on 'Clipboard': Write permission denied.
+[39m
+[2m10:04:21 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mTypeError: Failed to fetch
+    at onDone (http://localhost:5173/src/App.jsx?t=1780279354070:80:5)
+    at http://localhost:5173/src/api/client.js:45:49
