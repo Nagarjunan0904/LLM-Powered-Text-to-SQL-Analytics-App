@@ -57,3 +57,7 @@
 [2m11:10:05 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css[22m
 [2m10:11:29 AM[22m [36m[1m[vite][22m[39m [32m.env.development changed, restarting server...[39m
 [2m10:11:30 AM[22m [36m[1m[vite][22m[39m server restarted.
+[2m11:15:53 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css[22m
+[2m11:19:42 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/index.css[22m
+[2m10:12:03 AM[22m [36m[1m[vite][22m[39m [32m.env.development changed, restarting server...[39m
+[2m10:12:03 AM[22m [36m[1m[vite][22m[39m server restarted.

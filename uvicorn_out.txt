@@ -1,0 +1,4 @@
+API ready — schema cached, 1 tables, 38,310,226 rows
+INFO:     127.0.0.1:54557 - "GET /schema HTTP/1.1" 200 OK
+  API ready — schema cached, 1 tables, 38,310,226 rows
+ 
